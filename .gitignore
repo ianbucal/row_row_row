@@ -3,3 +3,4 @@
 .dart_tool/
 
 .env
+lib/row_row_row_generated/
