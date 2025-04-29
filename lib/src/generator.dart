@@ -289,14 +289,6 @@ String _generateRowClass(
     if (property is Map<String, dynamic>) {
       final fieldName = _toCamelCase(columnName);
       final isNullable = !requiredFields.contains(columnName);
-      // Get the dart type again to check if it needs 'required'
-      final apiType = property['format'] ?? property['type'] ?? 'unknown';
-      final dartType = _mapType(
-        apiType,
-        isNullable,
-        columnName: columnName,
-        property: property,
-      );
 
       if (!isNullable) {
         classBuffer.writeln('    required this.$fieldName,');
@@ -398,6 +390,7 @@ String _generateRowClass(
     }
   });
   classBuffer.writeln('    );');
+  classBuffer.writeln('  }');
   classBuffer.writeln();
 
   classBuffer.writeln('  Map<String, dynamic> toJson() {');
@@ -419,20 +412,6 @@ String _generateRowClass(
 
       // Check if it's an enum
       if (property.containsKey('enum') && property['enum'] is List) {
-        // Get enum name from mapping if available
-        String enumName;
-        if (columnEnumMap != null && columnEnumMap.containsKey(columnName)) {
-          enumName = columnEnumMap[columnName]!;
-        } else {
-          // Fallback to previous behavior
-          final typeName =
-              property['title'] as String? ??
-              property['x-enum-name'] as String? ??
-              property['x-pg-enum-name'] as String? ??
-              _toPascalCase(apiType == 'string' ? columnName : apiType);
-          enumName = '${_toPascalCase(typeName)}Enum';
-        }
-
         if (isNullable) {
           valueAccessor = '$fieldName?.toValue';
         } else {
@@ -469,7 +448,7 @@ String _generateRowClass(
             : enumName;
 
     buffer.writeln(
-      "import '../enums/${_toSnakeCase(enumBaseName)}.dart';",
+      "import '../enums/${_toSnakeCase(enumBaseName)}.enum.dart';",
     ); // Use snake_case for file name convention
   }
   if (needsJsonDecodeImport || requiredEnumImports.isNotEmpty) {
@@ -783,7 +762,7 @@ Future<void> generate({
 
                   // Use snake_case for file name convention
                   final enumFile = File(
-                    '${enumsDir.path}/${_toSnakeCase(enumBaseName)}.dart',
+                    '${enumsDir.path}/${_toSnakeCase(enumBaseName)}.enum.dart',
                   );
                   enumFile.writeAsStringSync(enumFileContent);
                   print('  -> Generated ${enumFile.path}');
