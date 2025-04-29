@@ -2,16 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.1.3 - Enum Type Detection & Generation
+## 0.1.3 - Enum Type Detection & Generation, Cleaning & Enum Improvements
 
 *   Added support for detecting and generating Dart enums from PostgreSQL enum types.
-*   Enum names are now derived from the database enum type name (instead of the column name).
-*   Created a new `enums` directory for the generated enum files with naming pattern `<EnumName>.enum.dart`.
+*   Enum names are now derived from the database enum type name (instead of the column 
+name).
+*   Created a new `enums` directory for the generated enum files with naming pattern 
+`<EnumName>.enum.dart`.
 *   Added helper methods in generated enum classes:
     *   `toValue` getter to convert enum to database string value.
     *   `fromValue` static method to convert database string value to enum.
     *   `tryFromValue` static method for safe conversion with null handling.
 *   Table row classes now use the proper enum types for columns that use enum types.
+*   Added optional `--clean` / `-c` flag to delete all existing generated files before generation.
+*   Improved enum file naming to be more consistent with Dart conventions:
+    *   Changed file naming pattern to use snake_case (`user_type.enum.dart` instead of camelCase).
+    *   Fixed redundant enum naming that could lead to names like `UserTypeEnum.enum.dart`.
+*   Fixed implementation of `_toSnakeCase` for proper conversion from camelCase and PascalCase.
+*   Fixed missing function `_getJsonCastType` that was causing errors.
+*   Removed redundant duplicate functions and code.
+*   Improved error handling in the code generation process.
+*   Added more descriptive logging during the generation process.
 
 ## 0.1.2 - Command Name Improvement
 

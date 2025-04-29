@@ -64,6 +64,7 @@ This command will:
 **Options:**
 
 *   `-f`, `--dart-format`: Automatically format the generated Dart files using `dart format`.
+*   `-c`, `--clean`: Delete all existing generated files before generating new ones.
 *   `-h`, `--help`: Show usage information, including all options.
 
 **Examples:**
@@ -74,6 +75,12 @@ dart run row_row_row generate
 
 # Generate models and format them
 dart run row_row_row generate --dart-format
+
+# Clean existing files and generate new ones
+dart run row_row_row generate --clean
+
+# Clean existing files, generate new ones, and format them
+dart run row_row_row generate --clean --dart-format
 
 # Show help
 dart run row_row_row --help 
