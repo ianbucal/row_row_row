@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.2 - Command Name Improvement
+
+*   Changed the command name from `list-tables-views` to `generate` for improved usability.
+*   Updated documentation to reflect the new command.
+
 ## 0.1.1 - Package Usability Improvements
 
 *   Updated package configuration to support usage from other projects.

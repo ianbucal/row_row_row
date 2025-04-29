@@ -18,7 +18,7 @@ void main(List<String> args) async {
           help: 'Print this usage information.',
         )
         ..addCommand(
-          'list-tables-views',
+          'generate',
         ) // Keep command for structure, though only one exists
         ..addFlag(
           'dart-format',
@@ -42,7 +42,7 @@ void main(List<String> args) async {
     final shouldFormat = results['dart-format'] as bool;
 
     // Ensure the command is the one we expect
-    if (command == 'list-tables-views') {
+    if (command == 'generate') {
       // Get required environment variables
       final supabaseUrl = env['SUPABASE_URL'];
       final serviceRoleKey = env['SERVICE_ROLE'];
@@ -84,7 +84,7 @@ void printUsage(ArgParser parser) {
   print('Usage: dart run row_row_row <command> [options]');
   print('\nGenerates Dart models for Supabase table rows.');
   print('\nAvailable commands:');
-  print('  list-tables-views   Generate Dart models from Supabase schema.');
+  print('  generate   Generate Dart models from Supabase schema.');
   print('\nOptions:');
   print(parser.usage);
 }
