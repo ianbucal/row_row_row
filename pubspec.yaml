@@ -1,6 +1,6 @@
 name: row_row_row
 description: A command-line tool to generate Dart models for Supabase table rows based on the OpenAPI spec.
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/ianbucal/row_row_row
 homepage: https://github.com/ianbucal/row_row_row
 issue_tracker: https://github.com/ianbucal/row_row_row/issues
@@ -18,7 +18,7 @@ dev_dependencies:
   test: ^1.25.2 # Use latest compatible version
 
 executables:
-  row_row_row: # Leave as is, or rename if desired for global activation
+  row_row_row: row_row_row
 
 # Optional: Add topics for pub.dev discovery
 topics:

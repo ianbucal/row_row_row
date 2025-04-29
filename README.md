@@ -24,17 +24,47 @@ Tired of writing boilerplate Dart classes for your Supabase tables? `row_row_row
         ```
         *(**Important:** Add `.env` to your `.gitignore` to keep your key safe!)*
 
-2.  **Dependencies:**
+2.  **Installation:**
+    
+    **Option 1: Add as a dependency to your project**
+    ```yaml
+    # In your pubspec.yaml
+    dependencies:
+      row_row_row: ^0.1.0
+    ```
+    
+    Then run:
     ```bash
     dart pub get
+    ```
+    
+    **Option 2: Use locally**
+    ```bash
+    dart pub get
+    ```
+    
+    **Option 3: Install globally**
+    ```bash
+    dart pub global activate row_row_row
     ```
 
 ## Usage
 
 **Generate Models:**
 
+If installed as a dependency:
+```bash
+dart run row_row_row list-tables-views [options]
+```
+
+If used locally:
 ```bash
 dart run bin/row_row_row.dart list-tables-views [options]
+```
+
+If installed globally:
+```bash
+dart pub global run row_row_row list-tables-views [options]
 ```
 
 This command will:
@@ -52,13 +82,13 @@ This command will:
 
 ```bash
 # Generate models (no formatting)
-dart run bin/row_row_row.dart list-tables-views
+dart run row_row_row list-tables-views
 
 # Generate models and format them
-dart run bin/row_row_row.dart list-tables-views --dart-format
+dart run row_row_row list-tables-views --dart-format
 
 # Show help
-dart run bin/row_row_row.dart --help 
+dart run row_row_row --help 
 ```
 
 ---

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.1 - Package Usability Improvements
+
+*   Updated package configuration to support usage from other projects.
+*   Fixed executable configuration in `pubspec.yaml`.
+*   Updated README with clearer installation and usage instructions:
+    *   Added instructions for using as a dependency.
+    *   Added instructions for global activation.
+    *   Clarified command usage patterns for all installation methods.
+
 ## 0.1.0 - Initial Release
 
 *   Initial version of the Supabase row generator.
