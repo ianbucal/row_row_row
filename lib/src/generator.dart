@@ -3,6 +3,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 // --- Helper Functions (Keep private within this file) ---
+
+/// Converts a snake_case string to PascalCase.
+///
+/// Takes a [text] string in snake_case format and returns a PascalCase string
+/// where each word segment is capitalized and joined without separators.
+///
+/// Example: "user_profile" becomes "UserProfile"
 String _toPascalCase(String text) {
   if (text.isEmpty) return '';
   return text
@@ -13,6 +20,13 @@ String _toPascalCase(String text) {
       .join();
 }
 
+/// Converts a snake_case string to camelCase.
+///
+/// Takes a [text] string in snake_case format and returns a camelCase string
+/// where the first word is lowercase and subsequent words are capitalized
+/// and joined without separators.
+///
+/// Example: "user_profile" becomes "userProfile"
 String _toCamelCase(String text) {
   if (text.isEmpty) return '';
   final parts = text.split('_');
@@ -26,6 +40,19 @@ String _toCamelCase(String text) {
   return [firstWord, ...remainingWords].join();
 }
 
+/// Maps database column types to Dart types.
+///
+/// Converts a database [apiType] to its corresponding Dart type.
+/// If [isNullable] is true, the returned type will include a nullable suffix '?'.
+///
+/// Supported type mappings:
+/// - 'uuid', 'text', 'varchar' → 'String'
+/// - 'integer', 'int4', 'int8', 'bigint' → 'int'
+/// - 'boolean' → 'bool'
+/// - 'timestamp with time zone', 'timestamp without time zone', 'date', 'timestamptz' → 'DateTime'
+/// - 'numeric', 'double precision', 'float4', 'float8' → 'double'
+/// - 'json', 'jsonb' → 'Map<String, dynamic>'
+/// - Any other type → 'dynamic'
 String _mapType(String apiType, bool isNullable) {
   final String baseType = switch (apiType) {
     'uuid' || 'text' || 'varchar' => 'String',
@@ -42,6 +69,21 @@ String _mapType(String apiType, bool isNullable) {
   return isNullable ? '$baseType?' : baseType;
 }
 
+/// Generates a Dart class for a database table.
+///
+/// Takes a [tableName], [properties] map containing column information,
+/// and [requiredFields] list to determine which fields should be required.
+///
+/// Returns a complete Dart class string that includes:
+/// - A static 'field' record for mapping between Dart fields and DB columns
+/// - Field declarations with proper Dart types
+/// - A const constructor with required/optional parameters
+/// - A fromJson factory constructor with proper type handling
+/// - A toJson method
+///
+/// The class follows naming conventions:
+/// - Class name: `<PascalCaseTableName>Row`
+/// - Field names: camelCase
 String _generateRowClass(
   String tableName,
   Map<String, dynamic> properties,
@@ -177,7 +219,24 @@ String _generateRowClass(
   return buffer.toString();
 }
 
-// --- Main Public Function ---
+/// Main function to generate Dart model classes for Supabase tables.
+///
+/// Connects to a Supabase project using [supabaseUrl] and [serviceRoleKey],
+/// then fetches the database schema via the OpenAPI specification.
+///
+/// For each table in the schema:
+/// - Analyzes column types and constraints
+/// - Generates a corresponding Dart class with appropriate types
+/// - Creates a file named `<tableName>.row.dart` in the output directory
+///
+/// Additionally, generates a schema report file with detailed information
+/// about all tables and columns.
+///
+/// If [formatCode] is true, runs `dart format` on the generated files.
+///
+/// This function requires a properly configured Supabase project with:
+/// - A valid project URL
+/// - A valid service role key with sufficient permissions
 Future<void> generate({
   required String supabaseUrl,
   required String serviceRoleKey,

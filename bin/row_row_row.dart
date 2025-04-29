@@ -3,6 +3,23 @@ import 'package:dotenv/dotenv.dart' as dotenv;
 import 'package:args/args.dart';
 import 'package:row_row_row/row_row_row.dart'; // Import the library
 
+/// Entry point for the row_row_row command-line application.
+///
+/// Processes command-line [args] to:
+/// 1. Load environment variables from a .env file
+/// 2. Parse and validate arguments using ArgParser
+/// 3. Execute the appropriate command based on user input
+///
+/// The main supported command is `generate`, which generates Dart model classes
+/// from a Supabase database schema.
+///
+/// Environment variables required:
+/// - SUPABASE_URL: URL of the Supabase project
+/// - SERVICE_ROLE: Service role key for API authentication
+///
+/// Exit codes:
+/// - 0: Success
+/// - 1: Error (invalid arguments, missing environment variables, etc.)
 void main(List<String> args) async {
   // Load environment variables
   final env = dotenv.DotEnv()..load();
@@ -80,6 +97,13 @@ void main(List<String> args) async {
   }
 }
 
+/// Prints usage information for the command-line tool.
+///
+/// Displays:
+/// - Basic usage syntax
+/// - Brief description
+/// - Available commands
+/// - Options with descriptions generated from the [parser]
 void printUsage(ArgParser parser) {
   print('Usage: dart run row_row_row <command> [options]');
   print('\nGenerates Dart models for Supabase table rows.');
