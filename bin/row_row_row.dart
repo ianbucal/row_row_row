@@ -44,6 +44,14 @@ void main(List<String> args) async {
           help:
               'Automatically format generated Dart files using "dart format".',
           defaultsTo: false,
+        )
+        ..addFlag(
+          'clean',
+          negatable: false,
+          abbr: 'c',
+          help:
+              'Delete all existing generated files before generating new ones.',
+          defaultsTo: false,
         );
 
   try {
@@ -57,6 +65,7 @@ void main(List<String> args) async {
 
     final command = results.command?.name;
     final shouldFormat = results['dart-format'] as bool;
+    final shouldClean = results['clean'] as bool;
 
     // Ensure the command is the one we expect
     if (command == 'generate') {
@@ -78,6 +87,7 @@ void main(List<String> args) async {
         supabaseUrl: supabaseUrl,
         serviceRoleKey: serviceRoleKey,
         formatCode: shouldFormat,
+        clean: shouldClean,
       );
       exit(0); // Success exit
     } else {

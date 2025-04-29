@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.3 - Enum Type Detection & Generation
+
+*   Added support for detecting and generating Dart enums from PostgreSQL enum types.
+*   Enum names are now derived from the database enum type name (instead of the column name).
+*   Created a new `enums` directory for the generated enum files with naming pattern `<EnumName>.enum.dart`.
+*   Added helper methods in generated enum classes:
+    *   `toValue` getter to convert enum to database string value.
+    *   `fromValue` static method to convert database string value to enum.
+    *   `tryFromValue` static method for safe conversion with null handling.
+*   Table row classes now use the proper enum types for columns that use enum types.
+
 ## 0.1.2 - Command Name Improvement
 
 *   Changed the command name from `list-tables-views` to `generate` for improved usability.
