@@ -116,17 +116,42 @@ String _mapType(
 
   // Standard type mapping
   final String baseType = switch (apiType) {
-    'uuid' || 'text' || 'varchar' => 'String',
-    'integer' || 'int4' || 'int8' || 'bigint' => 'int',
+    'uuid' ||
+    'text' ||
+    'varchar' ||
+    'character' ||
+    'character varying' => 'String',
+    'uuid[]' ||
+    'text[]' ||
+    'varchar[]' ||
+    'character[]' ||
+    'character varying[]' => 'List<String>',
+    'integer' || 'int4' || 'int8' || 'bigint' || 'smallint' => 'int',
+    'integer[]' ||
+    'int4[]' ||
+    'int8[]' ||
+    'bigint[]' ||
+    'smallint[]' => 'List<int>',
     'boolean' => 'bool',
+    'boolean[]' => 'List<bool>',
     'timestamp with time zone' ||
     'timestamp without time zone' ||
     'date' ||
     'timestamptz' => 'DateTime',
+    'timestamp with time zone[]' ||
+    'timestamp without time zone[]' ||
+    'date[]' ||
+    'timestamptz[]' => 'List<DateTime>',
     'numeric' || 'double precision' || 'float4' || 'float8' => 'double',
-    'json' || 'jsonb' => 'Map<String, dynamic>',
+    'numeric[]' ||
+    'double precision[]' ||
+    'float4[]' ||
+    'float8[]' => 'List<double>',
+    'json' || 'jsonb' => 'Map<dynamic, dynamic>',
+    'json[]' || 'jsonb[]' => 'List<Map<dynamic, dynamic>>',
     _ => 'dynamic', // Fallback for unknown types
   };
+  if (baseType == 'dynamic') return 'dynamic';
   return isNullable ? '$baseType?' : baseType;
 }
 
@@ -236,6 +261,11 @@ String _generateRowClass(
   final classBuffer = StringBuffer();
   classBuffer.writeln('class $className {');
 
+  // Adds a static field for the table name
+  classBuffer.writeln('  static const table = \'$tableName\';');
+  classBuffer.writeln();
+
+  // Adds a static field for the field names
   classBuffer.writeln('  static const field = (');
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
@@ -356,6 +386,47 @@ String _generateRowClass(
           parseLogic =
               '$jsonAccessor is String ? jsonDecode($jsonAccessor) : Map<String, dynamic>.from($jsonAccessor)';
         }
+      } else if (dartType.startsWith('Map<dynamic, dynamic>')) {
+        needsJsonDecodeImport = true;
+        if (isNullable) {
+          parseLogic =
+              '$jsonAccessor == null ? null : ($jsonAccessor is String ? jsonDecode($jsonAccessor) : Map.from($jsonAccessor))';
+        } else {
+          parseLogic =
+              '$jsonAccessor is String ? jsonDecode($jsonAccessor) : Map.from($jsonAccessor)';
+        }
+      } else if (dartType.startsWith('List<String>')) {
+        if (isNullable) {
+          parseLogic =
+              '$jsonAccessor == null ? null : List<String>.from($jsonAccessor)';
+        } else {
+          parseLogic = 'List<String>.from($jsonAccessor)';
+        }
+      } else if (dartType.startsWith('List<int>')) {
+        if (isNullable) {
+          parseLogic =
+              '$jsonAccessor == null ? null : List<int>.from($jsonAccessor.map((x) => x is String ? int.parse(x) : x is num ? x.toInt() : x))';
+        } else {
+          parseLogic =
+              'List<int>.from($jsonAccessor.map((x) => x is String ? int.parse(x) : x is num ? x.toInt() : x))';
+        }
+      } else if (dartType.startsWith('List<double>')) {
+        if (isNullable) {
+          parseLogic =
+              '$jsonAccessor == null ? null : List<double>.from($jsonAccessor.map((x) => x is String ? double.parse(x) : x is num ? x.toDouble() : x))';
+        } else {
+          parseLogic =
+              'List<double>.from($jsonAccessor.map((x) => x is String ? double.parse(x) : x is num ? x.toDouble() : x))';
+        }
+      } else if (dartType.startsWith('List<Map>')) {
+        needsJsonDecodeImport = true;
+        if (isNullable) {
+          parseLogic =
+              '$jsonAccessor == null ? null : List<Map>.from($jsonAccessor.map((x) => x is String ? jsonDecode(x) : Map.from(x)))';
+        } else {
+          parseLogic =
+              'List<Map>.from($jsonAccessor.map((x) => x is String ? jsonDecode(x) : Map.from(x)))';
+        }
       } else if (dartType == 'double') {
         parseLogic =
             '$jsonAccessor == null ? 0.0 : ($jsonAccessor as num).toDouble()';
@@ -391,7 +462,6 @@ String _generateRowClass(
   });
   classBuffer.writeln('    );');
   classBuffer.writeln('  }');
-  classBuffer.writeln();
 
   classBuffer.writeln('  Map<String, dynamic> toJson() {');
   classBuffer.writeln('    return {');
@@ -429,6 +499,42 @@ String _generateRowClass(
     }
   });
   classBuffer.writeln('    };');
+  classBuffer.writeln('  }');
+
+  // Add copyWith method
+  classBuffer.writeln();
+  classBuffer.writeln('  $className copyWith({');
+  properties.forEach((columnName, property) {
+    if (property is Map<String, dynamic>) {
+      final fieldName = _toCamelCase(columnName);
+      final apiType = property['format'] ?? property['type'] ?? 'unknown';
+      final isNullable = !requiredFields.contains(columnName);
+      final dartType = _mapType(
+        apiType,
+        isNullable,
+        columnName: columnName,
+        property: property,
+        enumTypeNames: columnEnumMap,
+      );
+
+      // If the type is already nullable (ends with ?), don't add another ?
+
+      if (dartType.endsWith('?') || dartType == 'dynamic') {
+        classBuffer.writeln('    $dartType $fieldName,');
+      } else {
+        classBuffer.writeln('    $dartType? $fieldName,');
+      }
+    }
+  });
+  classBuffer.writeln('  }) {');
+  classBuffer.writeln('    return $className(');
+  properties.forEach((columnName, property) {
+    if (property is Map<String, dynamic>) {
+      final fieldName = _toCamelCase(columnName);
+      classBuffer.writeln('      $fieldName: $fieldName ?? this.$fieldName,');
+    }
+  });
+  classBuffer.writeln('    );');
   classBuffer.writeln('  }');
 
   classBuffer.writeln('}');
