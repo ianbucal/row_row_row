@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.4 - Enhanced Usability and Data Type Handling
+
+*   Added `copyWith` method to all generated row classes for easier object modification.
+*   Removed nullable `?` for dynamic value typings.
+*   Improved JSON conversion with additional type support in `fromJson` factory:
+    *   Added support for `Map.from()` for dynamic maps.
+    *   Added support for `List<String>.from()` for string lists.
+    *   Added support for `List<int>.from()` with type conversion.
+    *   Added support for `List<double>.from()` with type conversion.
+    *   Added support for `List<Map>.from()` for lists of maps.
+*   Added support for more PostgreSQL data types:
+    *   `character` and `character varying` mapped to `String`.
+    *   `smallint` mapped to `int`.
+    *   Array variants of these types also supported.
+
 ## 0.1.3 - Enum Type Detection & Generation, Cleaning & Enum Improvements
 
 *   Added support for detecting and generating Dart enums from PostgreSQL enum types.
