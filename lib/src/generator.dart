@@ -147,8 +147,8 @@ String _mapType(
     'double precision[]' ||
     'float4[]' ||
     'float8[]' => 'List<double>',
-    'json' || 'jsonb' => 'Map<dynamic, dynamic>',
-    'json[]' || 'jsonb[]' => 'List<Map<dynamic, dynamic>>',
+    'json' || 'jsonb' => 'dynamic',
+    'json[]' || 'jsonb[]' => 'List<dynamic>',
     _ => 'dynamic', // Fallback for unknown types
   };
   if (baseType == 'dynamic') return 'dynamic';
