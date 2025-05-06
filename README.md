@@ -58,8 +58,8 @@ dart pub global run row_row_row generate [options]
 This command will:
 
 *   Fetch the schema from your Supabase project.
-*   Generate `.row.dart` model files in `lib/row_row_row_generated/tables/`.
-*   Create a schema report in `lib/row_row_row_generated/db_schema_report/`.
+*   Generate `.row.dart` model files in `lib/row_row_row/tables/`.
+*   Create a schema report in `lib/row_row_row/db_schema_report/`.
 
 **Options:**
 

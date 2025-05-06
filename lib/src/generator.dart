@@ -84,7 +84,8 @@ String _toSnakeCase(String input) {
 /// - 'boolean' → 'bool'
 /// - 'timestamp with time zone', 'timestamp without time zone', 'date', 'timestamptz' → 'DateTime'
 /// - 'numeric', 'double precision', 'float4', 'float8' → 'double'
-/// - 'json', 'jsonb' → 'Map<String, dynamic>'
+/// - 'json', 'jsonb' → 'dynamic'
+/// - 'json[]', 'jsonb[]' → 'List<dynamic>'
 /// - Any other type → 'dynamic'
 String _mapType(
   String apiType,
@@ -590,7 +591,7 @@ Future<void> _cleanDirectory(Directory directory) async {
 /// - Analyzes column types and constraints.
 /// - Detects columns using enums based on the 'enum' keyword in the spec.
 /// - Generates a corresponding Dart class (`<TableName>Row`) with appropriate types.
-/// - Creates a file named `<tableName>.row.dart` in `lib/row_row_row_generated/tables/`.
+/// - Creates a file named `<tableName>.row.dart` in `lib/row_row_row/tables/`.
 ///
 /// For each discovered enum type:
 /// - Generates a Dart enum file based on the database enum type name
@@ -615,7 +616,7 @@ Future<void> generate({
       DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
 
   // Define output directories
-  final baseOutputDir = 'lib/row_row_row_generated';
+  final baseOutputDir = 'lib/row_row_row';
   final reportDir = Directory('$baseOutputDir/db_schema_report');
   final tablesDir = Directory('$baseOutputDir/tables');
   final enumsDir = Directory('$baseOutputDir/enums'); // New directory for enums
@@ -652,7 +653,7 @@ Future<void> generate({
       await _cleanDirectory(enumsDir);
 
       // Delete the index file if it exists
-      final indexFile = File('$baseOutputDir/row_row_row_generated.dart');
+      final indexFile = File('$baseOutputDir/row_row_row.dart');
       if (await indexFile.exists()) {
         await indexFile.delete();
         print('Deleted existing index file: ${indexFile.path}');

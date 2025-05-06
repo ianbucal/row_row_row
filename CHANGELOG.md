@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.5 - Folder changes
+
+*   Moved the generated folder from `row_row_row_generated` into `row_row_row`.
+* Changed json, jsonb into dynamic
+* Changed json[], jsonb into List<dynamic>
+
+
+
 ## 0.1.4 - Enhanced Usability and Data Type Handling
 
 *   Added `copyWith` method to all generated row classes for easier object modification.
