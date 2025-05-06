@@ -1,74 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-
-// --- Helper Functions (Keep private within this file) ---
-
-/// Converts a snake_case string to PascalCase.
-///
-/// Takes a [text] string in snake_case format and returns a PascalCase string
-/// where each word segment is capitalized and joined without separators.
-///
-/// Example: "user_profile" becomes "UserProfile"
-String _toPascalCase(String text) {
-  if (text.isEmpty) return '';
-  return text
-      .split('_')
-      .map(
-        (word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1),
-      )
-      .join();
-}
-
-/// Converts a snake_case string to camelCase.
-///
-/// Takes a [text] string in snake_case format and returns a camelCase string
-/// where the first word is lowercase and subsequent words are capitalized
-/// and joined without separators.
-///
-/// Example: "user_profile" becomes "userProfile"
-String _toCamelCase(String text) {
-  if (text.isEmpty) return '';
-  final parts = text.split('_');
-  if (parts.isEmpty) return '';
-  final firstWord = parts.first;
-  final remainingWords = parts
-      .skip(1)
-      .map(
-        (word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1),
-      );
-  return [firstWord, ...remainingWords].join();
-}
-
-/// Converts a string to snake_case.
-///
-/// Takes a [input] string (which can be camelCase, PascalCase, or snake_case)
-/// and converts it to snake_case format.
-///
-/// Example:
-/// - "UserType" becomes "user_type"
-/// - "userProfile" becomes "user_profile"
-/// - "user_type" remains "user_type"
-String _toSnakeCase(String input) {
-  if (input.isEmpty) return input;
-
-  final result = StringBuffer();
-  result.write(input[0].toLowerCase());
-
-  for (int i = 1; i < input.length; i++) {
-    final char = input[i];
-    if (char == char.toUpperCase() &&
-        char != '_' &&
-        char.toUpperCase() != char.toLowerCase()) {
-      result.write('_');
-      result.write(char.toLowerCase());
-    } else {
-      result.write(char.toLowerCase());
-    }
-  }
-
-  return result.toString();
-}
+import 'extensions/string.extension.dart';
 
 /// Maps database column types to Dart types, considering potential enums.
 ///
@@ -108,9 +41,9 @@ String _mapType(
           property['title'] as String? ??
           property['x-enum-name'] as String? ??
           property['x-pg-enum-name'] as String? ??
-          _toPascalCase(apiType == 'string' ? columnName : apiType);
+          (apiType == 'string' ? columnName : apiType).toPascalCase();
       print('typeName: $property');
-      enumName = '${_toPascalCase(typeName)}Enum';
+      enumName = '${typeName.toPascalCase()}Enum';
     }
     return isNullable ? '$enumName?' : enumName;
   }
@@ -139,6 +72,8 @@ String _mapType(
     'timestamp without time zone' ||
     'date' ||
     'timestamptz' => 'DateTime',
+    'time' => 'String', // Time as HH:MM:SS string
+    'time[]' => 'List<String>', // Array of time strings
     'timestamp with time zone[]' ||
     'timestamp without time zone[]' ||
     'date[]' ||
@@ -174,9 +109,8 @@ String _generateEnumFile(String enumName, List<String> values) {
   // Generate enum values - attempt basic conversion for safety
   for (final value in values) {
     // Basic sanitization: convert to camelCase, replace non-alphanumeric with underscore
-    final dartValue = _toCamelCase(
-      value.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_'),
-    );
+    final dartValue =
+        value.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_').toCamelCase();
     buffer.writeln('  $dartValue,');
   }
   buffer.writeln('  ;'); // End of enum values
@@ -189,9 +123,8 @@ String _generateEnumFile(String enumName, List<String> values) {
   buffer.writeln('  String get toValue => switch (this) {');
   for (final value in values) {
     // FIX: Apply the same sanitization logic here
-    final dartValue = _toCamelCase(
-      value.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_'),
-    );
+    final dartValue =
+        value.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_').toCamelCase();
     buffer.writeln('        $enumName.$dartValue => \'$value\',');
   }
   buffer.writeln('      };');
@@ -207,7 +140,6 @@ String _generateEnumFile(String enumName, List<String> values) {
     '      orElse: () => throw ArgumentError("Invalid enum value: \$value for $enumName"),',
   );
   buffer.writeln('    );');
-  buffer.writeln('  }');
   buffer.writeln();
 
   // Generate tryFromValue static method
@@ -227,6 +159,358 @@ String _generateEnumFile(String enumName, List<String> values) {
   return buffer.toString();
 }
 
+/// Detects if a column is likely a primary key or auto-generated field.
+///
+/// Examines [columnName], [property] metadata, and other heuristics to determine if the field
+/// is likely a primary key or auto-generated value that shouldn't be included in create operations.
+///
+/// Returns true if the column appears to be a primary key or auto-generated field.
+bool _isPrimaryKeyOrAutoGenerated(
+  String columnName,
+  Map<String, dynamic> property,
+) {
+  // Common primary key naming patterns
+  final commonPkNames = ['id', 'uuid', '${columnName}_id', 'pk', 'primary_key'];
+
+  // Check column name first (most common case)
+  if (commonPkNames.contains(columnName.toLowerCase())) {
+    // If it has standard PK name, check type - UUIDs are usually auto-generated
+    final type = property['format'] ?? property['type'] ?? '';
+    if (type == 'uuid') {
+      return true;
+    }
+  }
+
+  // Check for PostgreSQL identity columns or auto-incrementing fields
+  final description = property['description'] as String? ?? '';
+  if (description.contains('nextval') ||
+      description.contains('auto-increment') ||
+      description.contains('identity')) {
+    return true;
+  }
+
+  // Check for OpenAPI metadata that suggests a primary key
+  if (property.containsKey('x-primary-key') ||
+      property.containsKey('x-pk') ||
+      property.containsKey('x-generated')) {
+    return true;
+  }
+
+  // Check for readOnly property which often indicates auto-generated fields
+  if (property['readOnly'] == true) {
+    return true;
+  }
+
+  // Default - not a PK or auto-generated field
+  return false;
+}
+
+/// Detects if a definition represents a database view rather than a table.
+///
+/// Views are read-only and shouldn't have CRUD operations generated.
+/// Uses PostgreSQL system catalog information via OpenAPI properties to identify views.
+/// The most reliable indicator is the 'relkind' from pg_class which indicates the object type:
+/// - 'r' = regular table
+/// - 'v' = view
+/// - 'm' = materialized view
+bool _isView(String tableName, Map<String, dynamic> definition) {
+  print('Analyzing if "$tableName" is a view...');
+
+  // Assume it's a table by default (only mark as view with definitive evidence)
+  bool isLikelyView = false;
+
+  // MOST RELIABLE: Check PostgreSQL table type information from pg_class
+  if (definition.containsKey('x-pg-class')) {
+    final pgClass = definition['x-pg-class'];
+
+    if (pgClass is Map && pgClass.containsKey('relkind')) {
+      final relkind = pgClass['relkind'];
+
+      // PostgreSQL defines these relkind values:
+      // 'r' = regular table
+      // 'v' = view
+      // 'm' = materialized view
+      // 'f' = foreign table
+
+      if (relkind == 'v' || relkind == 'm') {
+        print('  ✓ Confirmed as view: PostgreSQL relkind is "$relkind"');
+        return true; // Definitely a view
+      } else if (relkind == 'r') {
+        print(
+          '  ✓ Confirmed as table: PostgreSQL relkind is "$relkind" (regular table)',
+        );
+        return false; // Definitely a table
+      }
+
+      print('  relkind value found: "$relkind"');
+    }
+  }
+
+  // Check for explicit view flag
+  if (definition.containsKey('x-is-view') && definition['x-is-view'] == true) {
+    print('  ✓ Detected as view: Has explicit x-is-view: true flag');
+    return true;
+  }
+
+  // Check common view naming patterns - this is a strong indicator
+  final viewNamePatterns = [
+    'View',
+    'Summary',
+    'Sum',
+    'Count',
+    'Report',
+    'Statistics',
+    'Metrics',
+    'NumberOf',
+    'With',
+    'By',
+    'Per',
+    'Unseen',
+    'NextOrderOf',
+    'LastSeen',
+    'Dropdown',
+    'PerProject',
+    'Status',
+    'Relation',
+    'Names',
+    'Total',
+  ];
+
+  for (final pattern in viewNamePatterns) {
+    if (tableName.contains(pattern)) {
+      print(
+        '  ✓ Detected as view: Name contains "$pattern", which is a common view naming pattern',
+      );
+      return true;
+    }
+  }
+
+  // Look for aggregate function indicators in properties
+  if (definition.containsKey('properties')) {
+    final properties = definition['properties'] as Map<String, dynamic>;
+    final hasAggregateProps = properties.keys.any(
+      (key) =>
+          key.toString().toLowerCase().contains('count') ||
+          key.toString().toLowerCase().contains('sum') ||
+          key.toString().toLowerCase().contains('avg') ||
+          key.toString().toLowerCase().contains('min') ||
+          key.toString().toLowerCase().contains('max') ||
+          key.toString().toLowerCase().contains('total') ||
+          key.toString().toLowerCase().contains('number_of'),
+    );
+
+    if (hasAggregateProps) {
+      print('  ✓ Detected as view: Contains aggregate function column names');
+      return true;
+    }
+  }
+
+  // Check if table has primary keys (strong indicator of table vs view)
+  bool hasPrimaryKey = _hasPrimaryKeys(definition);
+  if (hasPrimaryKey) {
+    print('  ✓ Detected as table: Has primary key(s) defined');
+    return false; // Very likely a table, not a view
+  }
+
+  // Check if the object has read-only permissions (views are read-only)
+  if (definition.containsKey('x-pg-permissions')) {
+    final permissions = definition['x-pg-permissions'];
+    if (permissions is Map) {
+      // If insert/update/delete capabilities are explicitly set to false, it's likely a view
+      final isReadOnly =
+          (permissions['insert'] == false &&
+              permissions['update'] == false &&
+              permissions['delete'] == false);
+
+      if (isReadOnly) {
+        print('  ✓ Detected as view: Has read-only permissions');
+        isLikelyView = true;
+      } else {
+        // Has at least some write permissions
+        print('  ✓ Detected as table: Has data modification permissions');
+        return false;
+      }
+    }
+  }
+
+  // Check for id column - tables often have them, views sometimes don't
+  if (definition.containsKey('properties')) {
+    final properties = definition['properties'] as Map<String, dynamic>;
+    final hasIdColumn = properties.containsKey('id');
+
+    if (hasIdColumn) {
+      // Check if the id column has the usual primary key identifiers
+      final idProperty = properties['id'];
+      if (idProperty is Map &&
+          ((idProperty.containsKey('x-primary-key') &&
+                  idProperty['x-primary-key'] == true) ||
+              (idProperty['description']?.toString().contains('Primary Key') ==
+                  true))) {
+        print('  ✓ Detected as table: Has id column marked as primary key');
+        return false;
+      }
+    }
+  }
+
+  // DIAGNOSTIC: Log x- prefixed properties to help debug classification issues
+  final xKeys =
+      definition.keys.where((k) => k.toString().startsWith('x-')).toList();
+  if (xKeys.isNotEmpty) {
+    print('  Available x- metadata keys: ${xKeys.join(', ')}');
+  }
+
+  // If we have evidence it's a view, return true
+  if (isLikelyView) {
+    return true;
+  }
+
+  // Check if there are no required fields - views often have all nullable fields
+  if (!definition.containsKey('required') ||
+      (definition['required'] is List &&
+          (definition['required'] as List).isEmpty)) {
+    print(
+      '  ✓ Detected as view: No required fields, suggesting a read-only view',
+    );
+    return true;
+  }
+
+  // Special case for specifically named tables we know to be views
+  final knownViews = [
+    'NextOrderOfStatus',
+    'NumberOfTasksPerProjectStatus',
+    'NumberOfTasksPerProject',
+    'ProcedureWithCategoryClinicAreaNames',
+    'TaskClinicDepositSum',
+    'TaskClinicRefundSum',
+    'CustomerProcedureSubtotalView',
+    'SubtaskAssigneeName',
+    'ChatNumberOfUnseen',
+    'ChatCategoryRoomRelation',
+    'TaskAppointmentProcedureSummary',
+    'DueDateTaskSubtaskAppointmentView',
+    'TaskFromAsanaTempWithStatusAsignee',
+    'AnnouncementTargetAudienceView',
+    'AnnouncementWithTargetNames',
+    'TaskAppointmentProcedureSummaryCsv',
+  ];
+
+  for (final viewName in knownViews) {
+    if (tableName == viewName) {
+      print('  ✓ Detected as view: Matches known view "$viewName"');
+      return true;
+    }
+  }
+
+  // Default to table if we couldn't determine otherwise
+  print('  ✗ Unable to definitively determine, assuming it\'s a regular table');
+  return false;
+}
+
+/// Improved primary key detection for finding all primary key fields in a definition
+List<Map<String, dynamic>> _findPrimaryKeyFields(
+  Map<String, dynamic> definition,
+  Map<String, dynamic> properties,
+) {
+  List<Map<String, dynamic>> primaryKeys = [];
+
+  // Check for explicit primary keys in x-primary-keys array
+  if (definition.containsKey('x-primary-keys') &&
+      definition['x-primary-keys'] is List) {
+    final keyNames = definition['x-primary-keys'] as List;
+    print('  Found x-primary-keys: ${keyNames.join(', ')}');
+
+    for (final keyName in keyNames) {
+      if (properties.containsKey(keyName)) {
+        primaryKeys.add({
+          'name': keyName,
+          'field_name': keyName.toString().toCamelCase(),
+          'property': properties[keyName],
+        });
+      }
+    }
+
+    if (primaryKeys.isNotEmpty) {
+      return primaryKeys;
+    }
+  }
+
+  // Scan properties for primary key indicators
+  for (final entry in properties.entries) {
+    final columnName = entry.key;
+    final property = entry.value;
+
+    bool isPrimary = false;
+
+    if (property is Map<String, dynamic>) {
+      // Check for primary key metadata
+      if ((property.containsKey('x-primary-key') &&
+              property['x-primary-key'] == true) ||
+          (property.containsKey('x-pk') && property['x-pk'] == true)) {
+        isPrimary = true;
+      }
+
+      // Check if it's the typical 'id' field
+      if (columnName == 'id') {
+        isPrimary = true;
+      }
+
+      // Check description for primary key indicators
+      final description = property['description'] as String? ?? '';
+      if (description.toLowerCase().contains('primary key')) {
+        isPrimary = true;
+      }
+    }
+
+    if (isPrimary) {
+      primaryKeys.add({
+        'name': columnName,
+        'field_name': columnName.toString().toCamelCase(),
+        'property': property,
+      });
+    }
+  }
+
+  // If no primary keys were found, default to 'id' if it exists
+  if (primaryKeys.isEmpty && properties.containsKey('id')) {
+    primaryKeys.add({
+      'name': 'id',
+      'field_name': 'id',
+      'property': properties['id'],
+    });
+  }
+
+  return primaryKeys;
+}
+
+/// Helper to check if a definition contains primary keys
+bool _hasPrimaryKeys(Map<String, dynamic> definition) {
+  // Check for primary key in properties
+  if (definition.containsKey('properties')) {
+    final properties = definition['properties'] as Map<String, dynamic>;
+    for (final entry in properties.entries) {
+      final property = entry.value;
+      if (property is Map<String, dynamic>) {
+        // Check for primary key indicators
+        if (property.containsKey('x-primary-key') &&
+            property['x-primary-key'] == true) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // Check for primary key in x-primary-keys array
+  if (definition.containsKey('x-primary-keys') &&
+      definition['x-primary-keys'] is List) {
+    final keys = definition['x-primary-keys'] as List;
+    if (keys.isNotEmpty) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Generates a Dart class for a database table.
 ///
 /// Takes a [tableName], [properties] map containing column information,
@@ -240,6 +524,7 @@ String _generateEnumFile(String enumName, List<String> values) {
 /// - A const constructor with required/optional parameters
 /// - A fromJson factory constructor with proper type handling (including Enums)
 /// - A toJson method (including Enums)
+/// - CRUD methods for database operations (create, etc)
 /// - Necessary import statements for generated enums.
 ///
 /// The class follows naming conventions:
@@ -252,12 +537,18 @@ String _generateRowClass(
   Map<String, List<String>> enums, [ // Pass the discovered enums map
   Map<String, String>?
   columnEnumMap, // Optional map of column names to enum types
+  Map<String, dynamic>? definition, // Optional full definition of the table
 ]) {
-  final baseName = _toPascalCase(tableName);
+  final baseName = tableName.toPascalCase();
   final className = '${baseName}Row';
   final buffer = StringBuffer();
   bool needsJsonDecodeImport = false;
   final Set<String> requiredEnumImports = {}; // Track required enum imports
+
+  // Create a proper definition if none provided
+  final effectiveDefinition =
+      definition ??
+      {'properties': properties, 'required': requiredFields, 'name': tableName};
 
   final classBuffer = StringBuffer();
   classBuffer.writeln('class $className {');
@@ -270,7 +561,7 @@ String _generateRowClass(
   classBuffer.writeln('  static const field = (');
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
-      final fieldName = _toCamelCase(columnName);
+      final fieldName = columnName.toCamelCase();
       classBuffer.writeln('    $fieldName: \'$columnName\',');
     }
   });
@@ -279,7 +570,7 @@ String _generateRowClass(
 
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
-      final fieldName = _toCamelCase(columnName);
+      final fieldName = columnName.toCamelCase();
       final apiType = property['format'] ?? property['type'] ?? 'unknown';
       final isNullable = !requiredFields.contains(columnName);
 
@@ -304,8 +595,8 @@ String _generateRowClass(
               property['title'] as String? ??
               property['x-enum-name'] as String? ??
               property['x-pg-enum-name'] as String? ??
-              _toPascalCase(apiType == 'string' ? columnName : apiType);
-          enumName = '${_toPascalCase(typeName)}Enum';
+              (apiType == 'string' ? columnName : apiType).toPascalCase();
+          enumName = '${typeName.toPascalCase()}Enum';
         }
         requiredEnumImports.add(enumName);
       }
@@ -318,7 +609,7 @@ String _generateRowClass(
   classBuffer.writeln('  const $className({');
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
-      final fieldName = _toCamelCase(columnName);
+      final fieldName = columnName.toCamelCase();
       final isNullable = !requiredFields.contains(columnName);
 
       if (!isNullable) {
@@ -337,7 +628,7 @@ String _generateRowClass(
   classBuffer.writeln('    return $className(');
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
-      final fieldName = _toCamelCase(columnName);
+      final fieldName = columnName.toCamelCase();
       final apiType = property['format'] ?? property['type'] ?? 'unknown';
       final isNullable = !requiredFields.contains(columnName);
       final dartType = _mapType(
@@ -362,8 +653,8 @@ String _generateRowClass(
               property['title'] as String? ??
               property['x-enum-name'] as String? ??
               property['x-pg-enum-name'] as String? ??
-              _toPascalCase(apiType == 'string' ? columnName : apiType);
-          enumName = '${_toPascalCase(typeName)}Enum';
+              (apiType == 'string' ? columnName : apiType).toPascalCase();
+          enumName = '${typeName.toPascalCase()}Enum';
         }
 
         if (isNullable) {
@@ -372,11 +663,35 @@ String _generateRowClass(
           parseLogic = '$enumName.fromValue($jsonAccessor as String)';
         }
       } else if (dartType.startsWith('DateTime')) {
+        // Check if it's a timestamp with timezone that needs conversion
+        final isTimestampWithZone =
+            apiType == 'timestamp with time zone' || apiType == 'timestamptz';
+
         if (isNullable) {
-          parseLogic =
-              '$jsonAccessor == null ? null : DateTime.tryParse($jsonAccessor ?? \'\')';
+          if (isTimestampWithZone) {
+            // Convert to local time when reading from DB
+            parseLogic =
+                '$jsonAccessor == null ? null : DateTime.tryParse($jsonAccessor ?? \'\')?.toLocal()';
+          } else {
+            // Regular datetime without timezone conversion
+            parseLogic =
+                '$jsonAccessor == null ? null : DateTime.tryParse($jsonAccessor ?? \'\')';
+          }
         } else {
-          parseLogic = 'DateTime.parse($jsonAccessor)';
+          if (isTimestampWithZone) {
+            // Convert to local time when reading from DB
+            parseLogic = 'DateTime.parse($jsonAccessor).toLocal()';
+          } else {
+            // Regular datetime without timezone conversion
+            parseLogic = 'DateTime.parse($jsonAccessor)';
+          }
+        }
+      } else if (apiType == 'time') {
+        // Handle SQL time type as a string (HH:MM:SS format)
+        if (isNullable) {
+          parseLogic = '$jsonAccessor as String?';
+        } else {
+          parseLogic = '$jsonAccessor as String';
         }
       } else if (dartType.startsWith('Map<String, dynamic>')) {
         needsJsonDecodeImport = true;
@@ -463,12 +778,13 @@ String _generateRowClass(
   });
   classBuffer.writeln('    );');
   classBuffer.writeln('  }');
+  classBuffer.writeln('');
 
   classBuffer.writeln('  Map<String, dynamic> toJson() {');
   classBuffer.writeln('    return {');
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
-      final fieldName = _toCamelCase(columnName);
+      final fieldName = columnName.toCamelCase();
       final apiType = property['format'] ?? property['type'] ?? 'unknown';
       final isNullable = !requiredFields.contains(columnName);
       final dartType = _mapType(
@@ -489,11 +805,30 @@ String _generateRowClass(
           valueAccessor = '$fieldName.toValue';
         }
       } else if (dartType.startsWith('DateTime')) {
+        // Check if it's a timestamp with timezone that needs conversion
+        final isTimestampWithZone =
+            apiType == 'timestamp with time zone' || apiType == 'timestamptz';
+
         if (isNullable) {
-          valueAccessor = '$fieldName?.toIso8601String()';
+          if (isTimestampWithZone) {
+            // Convert to UTC when writing to DB
+            valueAccessor = '$fieldName?.toUtc().toIso8601String()';
+          } else {
+            // Regular datetime without timezone conversion
+            valueAccessor = '$fieldName?.toIso8601String()';
+          }
         } else {
-          valueAccessor = '$fieldName.toIso8601String()';
+          if (isTimestampWithZone) {
+            // Convert to UTC when writing to DB
+            valueAccessor = '$fieldName.toUtc().toIso8601String()';
+          } else {
+            // Regular datetime without timezone conversion
+            valueAccessor = '$fieldName.toIso8601String()';
+          }
         }
+      } else if (apiType == 'time') {
+        // Time is already a string in HH:MM:SS format, so we can pass it directly
+        valueAccessor = fieldName;
       }
       // other types serialize directly
       classBuffer.writeln('      field.$fieldName: $valueAccessor,');
@@ -507,7 +842,7 @@ String _generateRowClass(
   classBuffer.writeln('  $className copyWith({');
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
-      final fieldName = _toCamelCase(columnName);
+      final fieldName = columnName.toCamelCase();
       final apiType = property['format'] ?? property['type'] ?? 'unknown';
       final isNullable = !requiredFields.contains(columnName);
       final dartType = _mapType(
@@ -531,12 +866,253 @@ String _generateRowClass(
   classBuffer.writeln('    return $className(');
   properties.forEach((columnName, property) {
     if (property is Map<String, dynamic>) {
-      final fieldName = _toCamelCase(columnName);
+      final fieldName = columnName.toCamelCase();
       classBuffer.writeln('      $fieldName: $fieldName ?? this.$fieldName,');
     }
   });
   classBuffer.writeln('    );');
   classBuffer.writeln('  }');
+
+  // Check if this is a view - if it is, don't add CRUD methods
+  final bool isView = _isView(tableName, effectiveDefinition);
+
+  // Add diagnostic logging for better debugging
+  if (isView) {
+    print('⚠️ $tableName detected as a view - SKIPPING CRUD methods');
+    print('  Definition keys: ${effectiveDefinition.keys.join(', ')}');
+
+    // Add a comment in the generated class to indicate it's a view
+    classBuffer.writeln();
+    classBuffer.writeln('  // This is detected as a database VIEW.');
+    classBuffer.writeln('  // CRUD operations are not available for views.');
+    classBuffer.writeln('  // Views are read-only objects in the database.');
+  } else {
+    print('✅ $tableName detected as a table - ADDING CRUD methods');
+    print('  Definition keys: ${effectiveDefinition.keys.join(', ')}');
+
+    // Print 'x-' prefixed keys to check for view/table indicators
+    final xKeys =
+        effectiveDefinition.keys.where((k) => k.startsWith('x-')).toList();
+    if (xKeys.isNotEmpty) {
+      print('  x- prefixed keys: ${xKeys.join(', ')}');
+    }
+
+    // Only add CRUD methods if not a view - strict enforcement
+    // Add create method only for tables, not for views
+    classBuffer.writeln();
+    classBuffer.writeln('  /// Creates a new row in the database.');
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Only non-null fields will be included in the insert payload.',
+    );
+    classBuffer.writeln(
+      '  /// Primary keys and auto-generated fields can be set manually or left null for database defaults.',
+    );
+    classBuffer.writeln(
+      '  /// Returns the created row with any auto-generated values.',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Requires [supabase_flutter] package to be installed and initialized.',
+    );
+
+    // Create a new method that takes nullable parameters for all fields
+    classBuffer.writeln('  static Future<$className> create({');
+
+    // Add nullable parameters for all fields
+    properties.forEach((columnName, property) {
+      if (property is Map<String, dynamic>) {
+        final fieldName = columnName.toCamelCase();
+        final apiType = property['format'] ?? property['type'] ?? 'unknown';
+
+        // Get the base type without the nullable modifier
+        final dartType = _mapType(
+          apiType,
+          true, // Force nullable for all parameters
+          columnName: columnName,
+          property: property,
+          enumTypeNames: columnEnumMap,
+        );
+
+        classBuffer.writeln('    $dartType $fieldName,');
+      }
+    });
+
+    classBuffer.writeln('  }) async {');
+
+    // Create the insert payload directly from parameters using collection if syntax
+    classBuffer.writeln(
+      '    // Build the insert payload with only non-null fields using collection if',
+    );
+    classBuffer.writeln('    final Map<String, dynamic> insertPayload = {');
+
+    // Add each field with collection if syntax
+    properties.forEach((columnName, property) {
+      if (property is Map<String, dynamic>) {
+        final fieldName = columnName.toCamelCase();
+        final apiType = property['format'] ?? property['type'] ?? 'unknown';
+
+        // Handle special conversions for different types
+        if (apiType == 'timestamp with time zone' || apiType == 'timestamptz') {
+          // Convert to UTC for timestamp with timezone
+          classBuffer.writeln(
+            '      if ($fieldName != null) field.$fieldName: $fieldName.toUtc().toIso8601String(),',
+          );
+        } else if (apiType.startsWith('timestamp') || apiType == 'date') {
+          // Regular timestamp/date conversion
+          classBuffer.writeln(
+            '      if ($fieldName != null) field.$fieldName: $fieldName.toIso8601String(),',
+          );
+        } else if (property.containsKey('enum') && property['enum'] is List) {
+          // Handle enum conversion
+          classBuffer.writeln(
+            '      if ($fieldName != null) field.$fieldName: $fieldName.toValue,',
+          );
+        } else {
+          // Normal field
+          classBuffer.writeln(
+            '      if ($fieldName != null) field.$fieldName: $fieldName,',
+          );
+        }
+      }
+    });
+
+    classBuffer.writeln('    };');
+
+    classBuffer.writeln('');
+    classBuffer.writeln('    final response = await Supabase.instance.client');
+    classBuffer.writeln('        .from(table)');
+    classBuffer.writeln('        .insert(insertPayload)');
+    classBuffer.writeln('        .select()');
+    classBuffer.writeln('        .single();');
+    classBuffer.writeln('    return $className.fromJson(response);');
+    classBuffer.writeln('  }');
+
+    // Add getFromId method to fetch a row by its ID with improved naming
+    classBuffer.writeln();
+    classBuffer.writeln(
+      '  /// Fetches a single row from the database by its primary key.',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Returns the row if found, or throws an error if not found.',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Requires [supabase_flutter] package to be installed and initialized.',
+    );
+
+    // Find the primary key fields
+    final primaryKeyFields = _findPrimaryKeyFields(
+      effectiveDefinition,
+      properties,
+    );
+
+    // Create method name based on primary key fields
+    String methodName = 'getFrom';
+    List<String> parameters = [];
+    List<String> conditions = [];
+
+    if (primaryKeyFields.isEmpty) {
+      // Fallback if no primary keys found - use ID
+      methodName += 'Id';
+      parameters.add('String id');
+      conditions.add('field.id, id');
+      print(
+        '⚠️ No primary keys found for $tableName, using default "id" field',
+      );
+    } else {
+      // Generate method name based on primary key fields
+      if (primaryKeyFields.length == 1) {
+        // For single primary key, use the field name directly
+        final pkField = primaryKeyFields[0];
+        final fieldName = pkField['field_name'] as String;
+        final property = pkField['property'] as Map<String, dynamic>;
+        final originalName = pkField['name'] as String;
+
+        // Capitalize first letter for method name
+        methodName += fieldName[0].toUpperCase() + fieldName.substring(1);
+
+        // Generate parameter with proper type
+        final apiType = property['format'] ?? property['type'] ?? 'unknown';
+        String paramType;
+
+        if (apiType == 'integer' ||
+            apiType == 'int4' ||
+            apiType == 'int8' ||
+            apiType == 'bigint') {
+          paramType = 'int';
+        } else if (apiType == 'uuid') {
+          paramType = 'String';
+        } else {
+          // Use the full type mapping for other types
+          paramType = _mapType(
+            apiType,
+            false, // Primary keys are usually not nullable
+            columnName: originalName,
+            property: property,
+            enumTypeNames: columnEnumMap,
+          );
+        }
+
+        parameters.add('$paramType $fieldName');
+        conditions.add('field.$fieldName, $fieldName');
+      } else {
+        // For composite keys, combine field names
+        for (final pkField in primaryKeyFields) {
+          final fieldName = pkField['field_name'] as String;
+          final property = pkField['property'] as Map<String, dynamic>;
+          final originalName = pkField['name'] as String;
+
+          // Capitalize for method name part
+          methodName += fieldName[0].toUpperCase() + fieldName.substring(1);
+
+          // Generate parameter with proper type
+          final apiType = property['format'] ?? property['type'] ?? 'unknown';
+          String paramType;
+
+          if (apiType == 'integer' ||
+              apiType == 'int4' ||
+              apiType == 'int8' ||
+              apiType == 'bigint') {
+            paramType = 'int';
+          } else if (apiType == 'uuid') {
+            paramType = 'String';
+          } else {
+            paramType = _mapType(
+              apiType,
+              false,
+              columnName: originalName,
+              property: property,
+              enumTypeNames: columnEnumMap,
+            );
+          }
+
+          parameters.add('$paramType $fieldName');
+          conditions.add('field.$fieldName, $fieldName');
+        }
+      }
+    }
+
+    // Log the generated method name and parameters
+    print('  Generated fetch method: $methodName(${parameters.join(', ')})');
+
+    classBuffer.writeln(
+      '  static Future<$className> $methodName(${parameters.join(', ')}) async {',
+    );
+    classBuffer.writeln('    final response = await Supabase.instance.client');
+    classBuffer.writeln('        .from(table)');
+    classBuffer.writeln('        .select()');
+
+    // Add condition for each primary key
+    for (final condition in conditions) {
+      classBuffer.writeln('        .eq($condition)');
+    }
+
+    classBuffer.writeln('        .single();');
+    classBuffer.writeln('    return $className.fromJson(response);');
+    classBuffer.writeln('  }');
+  }
 
   classBuffer.writeln('}');
 
@@ -546,6 +1122,7 @@ String _generateRowClass(
   if (needsJsonDecodeImport) {
     buffer.writeln("import 'dart:convert';");
   }
+  buffer.writeln("import 'package:supabase_flutter/supabase_flutter.dart';");
   // Add required enum imports
   for (final enumName in requiredEnumImports) {
     // Strip 'Enum' suffix if present to avoid redundancy in file naming
@@ -555,7 +1132,7 @@ String _generateRowClass(
             : enumName;
 
     buffer.writeln(
-      "import '../enums/${_toSnakeCase(enumBaseName)}.enum.dart';",
+      "import '../enums/${enumBaseName.toSnakeCase()}.enum.dart';",
     ); // Use snake_case for file name convention
   }
   if (needsJsonDecodeImport || requiredEnumImports.isNotEmpty) {
@@ -652,13 +1229,6 @@ Future<void> generate({
       await _cleanDirectory(tablesDir);
       await _cleanDirectory(enumsDir);
 
-      // Delete the index file if it exists
-      final indexFile = File('$baseOutputDir/row_row_row.dart');
-      if (await indexFile.exists()) {
-        await indexFile.delete();
-        print('Deleted existing index file: ${indexFile.path}');
-      }
-
       print('Done cleaning. Ready to generate new files.');
       outputBuffer.writeln('Cleaned output directories before generation.\n');
     } else {
@@ -742,12 +1312,12 @@ Future<void> generate({
                       typeNameSource = 'type';
                     } else {
                       // If no explicit type name, derive it from column name
-                      typeName = '${_toPascalCase(columnName)}Type';
+                      typeName = '${columnName.toPascalCase()}Type';
                       typeNameSource = 'column name';
                     }
 
                     // Create a consistent Dart enum name
-                    final enumName = '${_toPascalCase(typeName)}Enum';
+                    final enumName = '${typeName.toPascalCase()}Enum';
 
                     // Store mapping from column to enum type
                     columnToEnumMapping['$tableName.$columnName'] = enumName;
@@ -828,18 +1398,47 @@ Future<void> generate({
                 });
                 outputBuffer.writeln('');
 
+                // Make sure definition is processed correctly when passed
+                print('\nProcessing: $tableName');
+                print('Definition type: ${definition.runtimeType}');
+                print('Definition keys: ${(definition).keys.join(', ')}');
+
                 try {
-                  // Generate the row class, passing the enum type mappings
+                  // Check if this is a view to add appropriate comment in the report
+                  final Map<String, dynamic> typedDefinition = {};
+
+                  // Copy all keys from original definition to ensure proper types
+                  (definition).forEach((key, value) {
+                    typedDefinition[key.toString()] = value;
+                  });
+
+                  // Ensure properties is properly added
+                  typedDefinition['properties'] = properties;
+                  typedDefinition['required'] = required;
+                  typedDefinition['name'] = tableName;
+
+                  final isView = _isView(tableName, typedDefinition);
+                  if (isView) {
+                    outputBuffer.writeln(
+                      '  (This is a database view, CRUD operations not available)',
+                    );
+                    print('⚠️ $tableName detected as a view in main function');
+                  } else {
+                    print('✅ $tableName detected as a table in main function');
+                  }
+
+                  // Generate the row class, passing the complete definition with proper types
                   final rowClassContent = _generateRowClass(
                     tableName,
                     properties,
                     required,
                     enumsToGenerate,
                     tableEnumMap, // Pass column->enum mapping for this table
+                    typedDefinition, // Pass the properly typed definition
                   );
                   // Use snake_case for file name convention
                   final rowFile = File(
-                    '${tablesDir.path}/${_toSnakeCase(tableName)}.row.dart',
+                    '${tablesDir.path}/${tableName.toSnakeCase()}.row.dart',
                   );
                   rowFile.writeAsStringSync(rowClassContent);
                   print('  -> Generated ${rowFile.path}');
@@ -869,7 +1468,7 @@ Future<void> generate({
 
                   // Use snake_case for file name convention
                   final enumFile = File(
-                    '${enumsDir.path}/${_toSnakeCase(enumBaseName)}.enum.dart',
+                    '${enumsDir.path}/${enumBaseName.toSnakeCase()}.enum.dart',
                   );
                   enumFile.writeAsStringSync(enumFileContent);
                   print('  -> Generated ${enumFile.path}');

@@ -12,6 +12,10 @@ Tired of writing boilerplate Dart classes for your Supabase tables? `row_row_row
 *   Includes a `fromJson` factory constructor for easy data parsing.
 *   Adds a static `field` record mapping Dart fields back to original database column names.
 *   Outputs a handy schema report (`.txt`) for reference.
+*   Generate `.row.dart` model files in `lib/row_row_row/tables/`.
+*   Create a schema report in `lib/row_row_row/db_schema_report/`.
+*   Generate Dart enum files for database enum types in `lib/row_row_row/enums/`.
+*   Built-in CRUD operations: Models include static methods for database operations.
 
 ## Setup
 
@@ -63,9 +67,9 @@ This command will:
 
 **Options:**
 
-*   `-f`, `--dart-format`: Automatically format the generated Dart files using `dart format`.
-*   `-c`, `--clean`: Delete all existing generated files before generating new ones.
-*   `-h`, `--help`: Show usage information, including all options.
+*   `--help`, `-h`: Show usage information, including all options.
+*   `--dart-format`, `-f`: Automatically format the generated Dart files using `dart format`.
+*   `--clean`, `-c`: Delete all existing generated files before generating new ones.
 
 **Examples:**
 
@@ -84,6 +88,45 @@ dart run row_row_row generate --clean --dart-format
 
 # Show help
 dart run row_row_row --help 
+```
+
+## Using Generated Models
+
+The generated Row models include type-safe Dart classes with built-in CRUD operations:
+
+```dart
+// Import the generated model
+import 'package:your_app/row_row_row/tables/user.row.dart';
+
+// CREATE: Add a new row to the database
+// All parameters are nullable, and only non-null values are included in the insert
+final createdUser = await UserRow.create(
+  name: 'John Doe',
+  email: 'john@example.com',
+  roleId: 2,
+);
+print(createdUser.id); // Auto-generated ID is available in the returned object
+
+// READ: Fetch a row by its primary key (throws error if not found)
+final user = await UserRow.getFromId('12345');
+
+// For tables with non-standard primary keys, method names reflect the field:
+// Primary key 'userId' → getFromUserId(userId)
+// Composite keys → getFromKey1Key2(key1, key2)
+```
+
+Note: The generated CRUD methods require the `supabase_flutter` package to be installed and properly initialized in your app:
+
+```dart
+// Add to your pubspec.yaml
+dependencies:
+  supabase_flutter: ^1.0.0
+
+// Initialize in your app
+await Supabase.initialize(
+  url: 'YOUR_SUPABASE_URL',
+  anonKey: 'YOUR_ANON_KEY',
+);
 ```
 
 ---

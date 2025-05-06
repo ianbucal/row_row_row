@@ -2,13 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.6 - Integrated CRUD Operations
+
+*   Added built-in CRUD operations directly in the Row model classes:
+    *   Added flexible `create` static method with all nullable parameters.
+    *   Added `getFromId` method to fetch rows by primary key (throws on not found).
+    *   Added safer `findById` method that returns null when records don't exist.
+    *   Smart insert payload - only non-null fields are included in the database insert.
+    *   Full developer control - all fields can be explicitly set or left for database defaults.
+    *   Automatic type handling - timestamps, dates, and enums are properly converted.
+    *   Table/View detection - CRUD operations are only generated for tables, not for views.
+    *   Generated models now include Supabase database integration.
+*   Row model files now import the Supabase Flutter package for database operations.
+*   Updated README with usage examples for CRUD operations.
+
 ## 0.1.5 - Folder changes
 
 *   Moved the generated folder from `row_row_row_generated` into `row_row_row`.
 * Changed json, jsonb into dynamic
 * Changed json[], jsonb into List<dynamic>
-
-
 
 ## 0.1.4 - Enhanced Usability and Data Type Handling
 

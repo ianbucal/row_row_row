@@ -12,6 +12,7 @@ dependencies:
   args: ^2.5.0 # Use latest compatible version
   dotenv: ^4.2.0 # Use latest compatible version
   http: ^1.2.1 # Use latest compatible version
+  supabase_flutter: ^2.9.0
 
 dev_dependencies:
   lints: ^4.0.0 # Use latest compatible version
