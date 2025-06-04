@@ -1,6 +1,6 @@
 name: row_row_row
 description: A Flutter package that generates type-safe database row classes from your Supabase database schema.
-version: 1.0.0
+version: 0.1.5
 homepage: https://github.com/ianbucal/row_row_row
 repository: https://github.com/ianbucal/row_row_row
 issue_tracker: https://github.com/ianbucal/row_row_row/issues
