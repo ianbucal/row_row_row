@@ -26,7 +26,7 @@ String _mapType(
   required String columnName,
   required Map<String, dynamic> property,
   Map<String, String>?
-  enumTypeNames, // Map column names to their enum type names
+      enumTypeNames, // Map column names to their enum type names
 }) {
   // Check for enum definition directly in the property
   print('property: $property');
@@ -37,8 +37,7 @@ String _mapType(
       enumName = enumTypeNames[columnName]!;
     } else {
       // Fallback: Use the database type name if available, otherwise derive from column name
-      final typeName =
-          property['title'] as String? ??
+      final typeName = property['title'] as String? ??
           property['x-enum-name'] as String? ??
           property['x-pg-enum-name'] as String? ??
           (apiType == 'string' ? columnName : apiType).toPascalCase();
@@ -54,35 +53,41 @@ String _mapType(
     'text' ||
     'varchar' ||
     'character' ||
-    'character varying' => 'String',
+    'character varying' =>
+      'String',
     'uuid[]' ||
     'text[]' ||
     'varchar[]' ||
     'character[]' ||
-    'character varying[]' => 'List<String>',
+    'character varying[]' =>
+      'List<String>',
     'integer' || 'int4' || 'int8' || 'bigint' || 'smallint' => 'int',
     'integer[]' ||
     'int4[]' ||
     'int8[]' ||
     'bigint[]' ||
-    'smallint[]' => 'List<int>',
+    'smallint[]' =>
+      'List<int>',
     'boolean' => 'bool',
     'boolean[]' => 'List<bool>',
     'timestamp with time zone' ||
     'timestamp without time zone' ||
     'date' ||
-    'timestamptz' => 'DateTime',
+    'timestamptz' =>
+      'DateTime',
     'time' => 'String', // Time as HH:MM:SS string
     'time[]' => 'List<String>', // Array of time strings
     'timestamp with time zone[]' ||
     'timestamp without time zone[]' ||
     'date[]' ||
-    'timestamptz[]' => 'List<DateTime>',
+    'timestamptz[]' =>
+      'List<DateTime>',
     'numeric' || 'double precision' || 'float4' || 'float8' => 'double',
     'numeric[]' ||
     'double precision[]' ||
     'float4[]' ||
-    'float8[]' => 'List<double>',
+    'float8[]' =>
+      'List<double>',
     'json' || 'jsonb' => 'dynamic',
     'json[]' || 'jsonb[]' => 'List<dynamic>',
     _ => 'dynamic', // Fallback for unknown types
@@ -212,10 +217,9 @@ bool _isView(String tableName, Map<String, dynamic> definition) {
     final permissions = definition['x-pg-permissions'];
     if (permissions is Map) {
       // If insert/update/delete capabilities are explicitly set to false, it's likely a view
-      final isReadOnly =
-          (permissions['insert'] == false &&
-              permissions['update'] == false &&
-              permissions['delete'] == false);
+      final isReadOnly = (permissions['insert'] == false &&
+          permissions['update'] == false &&
+          permissions['delete'] == false);
 
       if (isReadOnly) {
         print('  ✓ Detected as view: Has read-only permissions');
@@ -271,6 +275,12 @@ bool _isView(String tableName, Map<String, dynamic> definition) {
 }
 
 /// Improved primary key detection for finding all primary key fields in a definition
+///
+/// Analyzes the [definition] and [properties] to find all fields that are part of the primary key.
+/// Returns a list of maps containing:
+/// - 'name': The original column name
+/// - 'field_name': The camelCase field name
+/// - 'property': The full property definition
 List<Map<String, dynamic>> _findPrimaryKeyFields(
   Map<String, dynamic> definition,
   Map<String, dynamic> properties,
@@ -347,6 +357,9 @@ List<Map<String, dynamic>> _findPrimaryKeyFields(
 }
 
 /// Helper to check if a definition contains primary keys
+///
+/// Checks both explicit primary key definitions and implicit ones (like 'id' field).
+/// Returns true if any primary key is found.
 bool _hasPrimaryKeys(Map<String, dynamic> definition) {
   // Check for primary key in properties
   if (definition.containsKey('properties')) {
@@ -398,9 +411,10 @@ String _generateRowClass(
   String tableName,
   Map<String, dynamic> properties,
   List<dynamic> requiredFields,
-  Map<String, List<String>> enums, [ // Pass the discovered enums map
+  Map<String, List<String>> enums, [
+  // Pass the discovered enums map
   Map<String, String>?
-  columnEnumMap, // Optional map of column names to enum types
+      columnEnumMap, // Optional map of column names to enum types
   Map<String, dynamic>? definition, // Optional full definition of the table
 ]) {
   final baseName = tableName.toPascalCase();
@@ -410,8 +424,7 @@ String _generateRowClass(
   final Set<String> requiredEnumImports = {}; // Track required enum imports
 
   // Create a proper definition if none provided
-  final effectiveDefinition =
-      definition ??
+  final effectiveDefinition = definition ??
       {'properties': properties, 'required': requiredFields, 'name': tableName};
 
   final classBuffer = StringBuffer();
@@ -455,8 +468,7 @@ String _generateRowClass(
           enumName = columnEnumMap[columnName]!;
         } else {
           // Fallback to previous behavior
-          final typeName =
-              property['title'] as String? ??
+          final typeName = property['title'] as String? ??
               property['x-enum-name'] as String? ??
               property['x-pg-enum-name'] as String? ??
               (apiType == 'string' ? columnName : apiType).toPascalCase();
@@ -513,8 +525,7 @@ String _generateRowClass(
           enumName = columnEnumMap[columnName]!;
         } else {
           // Fallback to previous behavior
-          final typeName =
-              property['title'] as String? ??
+          final typeName = property['title'] as String? ??
               property['x-enum-name'] as String? ??
               property['x-pg-enum-name'] as String? ??
               (apiType == 'string' ? columnName : apiType).toPascalCase();
@@ -1218,10 +1229,9 @@ String _generateRowClass(
   // Add required enum imports
   for (final enumName in requiredEnumImports) {
     // Strip 'Enum' suffix if present to avoid redundancy in file naming
-    final enumBaseName =
-        enumName.endsWith('Enum')
-            ? enumName.substring(0, enumName.length - 4)
-            : enumName;
+    final enumBaseName = enumName.endsWith('Enum')
+        ? enumName.substring(0, enumName.length - 4)
+        : enumName;
 
     buffer.writeln(
       "import '../enums/${enumBaseName.toSnakeCase()}.enum.dart';",
@@ -1237,6 +1247,9 @@ String _generateRowClass(
 }
 
 /// Deletes all files in a directory (but keeps the directory)
+///
+/// Used to clean up generated files before regenerating them.
+/// Recursively deletes all files and subdirectories in [directory].
 Future<void> _cleanDirectory(Directory directory) async {
   if (await directory.exists()) {
     final entities = await directory.list().toList();
@@ -1275,7 +1288,7 @@ Future<void> generate({
   required String supabaseUrl,
   required String serviceRoleKey,
   required bool formatCode,
-  bool clean = false, // Add clean parameter with default value of false
+  bool clean = false,
 }) async {
   final Uri uri = Uri.parse(supabaseUrl);
   final String projectId = uri.host.split('.').first;
@@ -1384,9 +1397,9 @@ Future<void> generate({
                     if (property.containsKey('format')) {
                       // remove "public." prefix if present
                       typeName = property['format'].toString().replaceFirst(
-                        'public.',
-                        '',
-                      );
+                            'public.',
+                            '',
+                          );
                       typeNameSource = 'format';
                     } else if (property.containsKey('title')) {
                       typeName = property['title'] as String;
@@ -1553,10 +1566,9 @@ Future<void> generate({
                 try {
                   final enumFileContent = _generateEnumFile(enumName, values);
                   // Strip 'Enum' suffix if present to avoid redundancy in file naming
-                  final enumBaseName =
-                      enumName.endsWith('Enum')
-                          ? enumName.substring(0, enumName.length - 4)
-                          : enumName;
+                  final enumBaseName = enumName.endsWith('Enum')
+                      ? enumName.substring(0, enumName.length - 4)
+                      : enumName;
 
                   // Use snake_case for file name convention
                   final enumFile = File(

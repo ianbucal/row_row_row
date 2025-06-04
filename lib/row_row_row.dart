@@ -1,4 +1,4 @@
-/// A Dart library for generating typed model classes from Supabase database schema.
+/// A Flutter package that generates type-safe database row classes from your Supabase database schema.
 ///
 /// The row_row_row library connects to your Supabase project, fetches the
 /// database schema via the OpenAPI specification, and generates strongly-typed
