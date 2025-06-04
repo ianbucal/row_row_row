@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.6
+
+*   Updated README with usage examples for CRUD operations.
+*   Reorganized project structure for better maintainability
+*   Integrated comprehensive CRUD operations in generated classes
+*   Added range-based retrieval methods for numeric and date fields
+*   Improved type safety with proper null handling
+*   Enhanced enum support with better type mapping
+*   Added proper timezone handling for timestamp fields
+*   Improved error handling in database operations
+*   Added support for composite primary keys
+*   Enhanced documentation for generated methods
+
 ## 0.1.5
 
 *   Moved the generated folder from `row_row_row_generated` into `row_row_row`.
@@ -17,16 +30,7 @@ All notable changes to this project will be documented in this file.
     *   Table/View detection - CRUD operations are only generated for tables, not for views.
     *   Generated models now include Supabase database integration.
 *   Row model files now import the Supabase Flutter package for database operations.
-*   Updated README with usage examples for CRUD operations.
-*   Reorganized project structure for better maintainability
-*   Integrated comprehensive CRUD operations in generated classes
-*   Added range-based retrieval methods for numeric and date fields
-*   Improved type safety with proper null handling
-*   Enhanced enum support with better type mapping
-*   Added proper timezone handling for timestamp fields
-*   Improved error handling in database operations
-*   Added support for composite primary keys
-*   Enhanced documentation for generated methods
+
 
 ## 0.1.4
 
