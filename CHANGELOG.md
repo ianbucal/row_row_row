@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.1.5 - Folder changes, Integrated CRUD Operations
+## 0.1.5
 
 *   Moved the generated folder from `row_row_row_generated` into `row_row_row`.
 *   Changed json, jsonb into dynamic
@@ -28,7 +28,7 @@ All notable changes to this project will be documented in this file.
 *   Added support for composite primary keys
 *   Enhanced documentation for generated methods
 
-## 0.1.4 - Enhanced Usability and Data Type Handling
+## 0.1.4
 
 *   Added `copyWith` method to all generated row classes for easier object modification.
 *   Removed nullable `?` for dynamic value typings.
@@ -43,7 +43,7 @@ All notable changes to this project will be documented in this file.
     *   `smallint` mapped to `int`.
     *   Array variants of these types also supported.
 
-## 0.1.3 - Enum Type Detection & Generation, Cleaning & Enum Improvements
+## 0.1.3
 
 *   Added support for detecting and generating Dart enums from PostgreSQL enum types.
 *   Enum names are now derived from the database enum type name (instead of the column 
@@ -65,7 +65,7 @@ name).
 *   Improved error handling in the code generation process.
 *   Added more descriptive logging during the generation process.
 
-## 0.1.2 - Command Name Improvement
+## 0.1.2
 
 *   Changed the command name from `list-tables-views` to `generate` for improved usability.
 *   Updated documentation to reflect the new command.
