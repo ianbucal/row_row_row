@@ -79,7 +79,7 @@ name).
     *   Added instructions for global activation.
     *   Clarified command usage patterns for all installation methods.
 
-## 0.1.0 - Initial Release
+## 0.1.0
 
 *   Initial version of the Supabase row generator.
 *   Connects to Supabase via Service Role Key using `.env` file.
