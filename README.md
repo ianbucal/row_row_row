@@ -15,7 +15,13 @@ Tired of writing boilerplate Dart classes for your Supabase tables? `row_row_row
 *   Generate `.row.dart` model files in `lib/row_row_row/tables/`.
 *   Create a schema report in `lib/row_row_row/db_schema_report/`.
 *   Generate Dart enum files for database enum types in `lib/row_row_row/enums/`.
-*   Built-in CRUD operations: Models include static methods for database operations.
+*   Built-in CRUD operations with comprehensive database integration:
+    *   Create, read, update, and delete operations
+    *   Range-based retrieval for numeric and date fields
+    *   Support for composite primary keys
+    *   Proper timezone handling for timestamps
+    *   Enhanced enum support with type mapping
+    *   Improved error handling and type safety
 
 ## Setup
 
@@ -109,6 +115,22 @@ print(createdUser.id); // Auto-generated ID is available in the returned object
 
 // READ: Fetch a row by its primary key (throws error if not found)
 final user = await UserRow.getFromId('12345');
+
+// READ: Range-based retrieval for numeric fields
+final highValueUsers = await UserRow.retrieveBalanceByRange(
+  greaterThan: 1000,
+  lessThan: 5000,
+  orderBy: 'created_at',
+  orderAsc: true,
+);
+
+// READ: Range-based retrieval for date fields
+final recentUsers = await UserRow.retrieveCreatedAtByRange(
+  greaterThanOrEqual: DateTime(2024, 1, 1),
+  lessThan: DateTime(2024, 2, 1),
+  orderBy: 'created_at',
+  orderAsc: false,
+);
 
 // For tables with non-standard primary keys, method names reflect the field:
 // Primary key 'userId' → getFromUserId(userId)

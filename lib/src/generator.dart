@@ -889,12 +889,18 @@ String _generateRowClass(
       );
     }
 
-    // Determine default orderBy value
-    String defaultOrderBy = 'null';
+    // Determine default orderBy value and type
+    String orderByParam;
+    bool isOrderByNullable;
     if (properties.containsKey('updated_at')) {
-      defaultOrderBy = '"updated_at"';
+      orderByParam = 'String orderBy = "updated_at"';
+      isOrderByNullable = false;
     } else if (properties.containsKey('created_at')) {
-      defaultOrderBy = '"created_at"';
+      orderByParam = 'String orderBy = "created_at"';
+      isOrderByNullable = false;
+    } else {
+      orderByParam = 'String? orderBy';
+      isOrderByNullable = true;
     }
 
     // Add method documentation
@@ -927,7 +933,7 @@ String _generateRowClass(
         'retrieveBy${fieldName[0].toUpperCase()}${fieldName.substring(1)}';
     classBuffer.writeln('  static Future<$className> $methodName(');
     classBuffer.writeln('    $paramType $fieldName, {');
-    classBuffer.writeln('    String? orderBy = $defaultOrderBy,');
+    classBuffer.writeln('    $orderByParam,');
     classBuffer.writeln('    bool orderAsc = false,');
     classBuffer.writeln('  }) async {');
     classBuffer.writeln('    final query = Supabase.instance.client');
@@ -936,23 +942,132 @@ String _generateRowClass(
     classBuffer.writeln('        .eq(field.$fieldName, $fieldName);');
     classBuffer.writeln();
     classBuffer.writeln('    // Apply ordering if specified');
-    classBuffer.writeln('    if (orderBy != null) {');
-    classBuffer.writeln('      query.order(orderBy, ascending: orderAsc);');
-    classBuffer.writeln('    }');
+    if (isOrderByNullable) {
+      classBuffer.writeln('    if (orderBy != null) {');
+      classBuffer.writeln('      query.order(orderBy, ascending: orderAsc);');
+      classBuffer.writeln('    }');
+    } else {
+      classBuffer.writeln('    query.order(orderBy, ascending: orderAsc);');
+    }
     classBuffer.writeln();
     classBuffer.writeln('    final response = await query.single();');
     classBuffer.writeln('    return $className.fromJson(response);');
     classBuffer.writeln('  }');
+
+    // Add range-based retrieval for numeric and date fields
+    if (apiType == 'integer' ||
+        apiType == 'int4' ||
+        apiType == 'int8' ||
+        apiType == 'bigint' ||
+        apiType == 'numeric' ||
+        apiType == 'double precision' ||
+        apiType == 'float4' ||
+        apiType == 'float8' ||
+        apiType == 'timestamp with time zone' ||
+        apiType == 'timestamp without time zone' ||
+        apiType == 'date' ||
+        apiType == 'timestamptz') {
+      // Add range method documentation
+      classBuffer.writeln();
+      classBuffer.writeln(
+        '  /// Retrieves rows from the database where $fieldName is within the specified range.',
+      );
+      classBuffer.writeln('  /// ');
+      classBuffer.writeln(
+        '  /// Returns a list of rows matching the range criteria.',
+      );
+      classBuffer.writeln('  /// ');
+      classBuffer.writeln(
+        '  /// Range parameters are optional. If none are provided, all rows will be returned.',
+      );
+      classBuffer.writeln('  /// ');
+      classBuffer.writeln(
+        '  /// [orderBy] specifies which field to sort by. If not provided, defaults to:',
+      );
+      classBuffer.writeln('  /// - "updated_at" if the field exists');
+      classBuffer.writeln('  /// - "created_at" if the field exists');
+      classBuffer.writeln(
+        '  /// - No default ordering if neither field exists',
+      );
+      classBuffer.writeln('  /// ');
+      classBuffer.writeln(
+        '  /// [orderAsc] determines the sort order. Defaults to false (descending).',
+      );
+      classBuffer.writeln('  /// ');
+      classBuffer.writeln(
+        '  /// Requires [supabase_flutter] package to be installed and initialized.',
+      );
+
+      // Generate the range method
+      final rangeMethodName =
+          'retrieve${fieldName[0].toUpperCase()}${fieldName.substring(1)}ByRange';
+      classBuffer.writeln(
+        '  static Future<List<$className>> $rangeMethodName({',
+      );
+      classBuffer.writeln('    $paramType? lessThan,');
+      classBuffer.writeln('    $paramType? greaterThan,');
+      classBuffer.writeln('    $paramType? lessThanOrEqual,');
+      classBuffer.writeln('    $paramType? greaterThanOrEqual,');
+      classBuffer.writeln('    $orderByParam,');
+      classBuffer.writeln('    bool orderAsc = false,');
+      classBuffer.writeln('  }) async {');
+      classBuffer.writeln('    final query = Supabase.instance.client');
+      classBuffer.writeln('        .from(table)');
+      classBuffer.writeln('        .select();');
+      classBuffer.writeln();
+      classBuffer.writeln('    // Apply range conditions');
+      classBuffer.writeln('    if (lessThan != null) {');
+      classBuffer.writeln('      query.lt(field.$fieldName, lessThan);');
+      classBuffer.writeln('    }');
+      classBuffer.writeln('    if (greaterThan != null) {');
+      classBuffer.writeln('      query.gt(field.$fieldName, greaterThan);');
+      classBuffer.writeln('    }');
+      classBuffer.writeln('    if (lessThanOrEqual != null) {');
+      classBuffer.writeln(
+        '      query.lte(field.$fieldName, lessThanOrEqual);',
+      );
+      classBuffer.writeln('    }');
+      classBuffer.writeln('    if (greaterThanOrEqual != null) {');
+      classBuffer.writeln(
+        '      query.gte(field.$fieldName, greaterThanOrEqual);',
+      );
+      classBuffer.writeln('    }');
+
+      // Add ordering
+      classBuffer.writeln();
+      classBuffer.writeln('    // Apply ordering if specified');
+      if (isOrderByNullable) {
+        classBuffer.writeln('    if (orderBy != null) {');
+        classBuffer.writeln('      query.order(orderBy, ascending: orderAsc);');
+        classBuffer.writeln('    }');
+      } else {
+        classBuffer.writeln('    query.order(orderBy, ascending: orderAsc);');
+      }
+
+      // Return the results
+      classBuffer.writeln();
+      classBuffer.writeln('    final response = await query;');
+      classBuffer.writeln(
+        '    return response.map((json) => $className.fromJson(json)).toList();',
+      );
+      classBuffer.writeln('  }');
+    }
   }
 
   // Handle primary key getters
   if (primaryKeyFields.isNotEmpty) {
-    // Determine default orderBy value
-    String defaultOrderBy = 'null';
+    // Determine default orderBy value and type
+    String orderByParam;
+    bool isOrderByNullable;
     if (properties.containsKey('updated_at')) {
-      defaultOrderBy = 'field.updatedAt';
+      orderByParam = 'String orderBy = "updated_at"';
+      isOrderByNullable = false;
     } else if (properties.containsKey('created_at')) {
-      defaultOrderBy = 'field.createdAt';
+      orderByParam = 'String orderBy = "created_at"';
+      isOrderByNullable = false;
+    } else {
+      orderByParam = 'String? orderBy';
+      isOrderByNullable = true;
     }
 
     // Add method documentation
@@ -1060,7 +1175,7 @@ String _generateRowClass(
 
     classBuffer.writeln('  static Future<$className> $methodName(');
     classBuffer.writeln('    ${parameters.join(', ')}, {');
-    classBuffer.writeln('    String? orderBy = $defaultOrderBy,');
+    classBuffer.writeln('    $orderByParam,');
     classBuffer.writeln('    bool orderAsc = false,');
     classBuffer.writeln('  }) async {');
     classBuffer.writeln('    final query = Supabase.instance.client');
@@ -1071,12 +1186,16 @@ String _generateRowClass(
     for (final condition in conditions) {
       classBuffer.writeln('        .eq($condition)');
     }
-
+    classBuffer.writeln(';');
     classBuffer.writeln();
     classBuffer.writeln('    // Apply ordering if specified');
-    classBuffer.writeln('    if (orderBy != null) {');
-    classBuffer.writeln('      query.order(orderBy, ascending: orderAsc);');
-    classBuffer.writeln('    }');
+    if (isOrderByNullable) {
+      classBuffer.writeln('    if (orderBy != null) {');
+      classBuffer.writeln('      query.order(orderBy, ascending: orderAsc);');
+      classBuffer.writeln('    }');
+    } else {
+      classBuffer.writeln('    query.order(orderBy, ascending: orderAsc);');
+    }
     classBuffer.writeln();
     classBuffer.writeln('    final response = await query.single();');
     classBuffer.writeln('    return $className.fromJson(response);');
