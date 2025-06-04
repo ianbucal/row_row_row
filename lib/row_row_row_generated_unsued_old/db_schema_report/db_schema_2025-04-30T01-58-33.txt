@@ -1,0 +1,15 @@
+DATABASE SCHEMA EXPORT
+Exported at: 2025-04-30 01:58:33.334979
+Supabase URL: https://uxetqphrzngllbnvrvwu.supabase.co
+Project ID: uxetqphrzngllbnvrvwu
+----------------------------------------
+
+FETCHING ENUM TYPES USING SQL QUERY:
+---------------------------------
+No enum types found via SQL query.
+Will also check OpenAPI spec for enum information.
+
+
+GENERATING FILES:
+----------------
+Generated index file: lib/row_row_row_generated/row_row_row_generated.dart

@@ -780,19 +780,6 @@ String _generateRowClass(
       '  /// Requires [supabase_flutter] package to be installed and initialized.',
     );
 
-    // Add documentation for getFrom method
-    classBuffer.writeln(
-      '  /// Fetches a single row from the database by its primary key.',
-    );
-    classBuffer.writeln('  /// ');
-    classBuffer.writeln(
-      '  /// Returns the row if found, or throws an error if not found.',
-    );
-    classBuffer.writeln('  /// ');
-    classBuffer.writeln(
-      '  /// Requires [supabase_flutter] package to be installed and initialized.',
-    );
-
     // Create a new method that takes nullable parameters for all fields
     classBuffer.writeln('  static Future<$className> create({');
 
@@ -864,42 +851,182 @@ String _generateRowClass(
     classBuffer.writeln('        .single();');
     classBuffer.writeln('    return $className.fromJson(response);');
     classBuffer.writeln('  }');
+  }
 
-    // Find the primary key fields
-    final primaryKeyFields = _findPrimaryKeyFields(
-      effectiveDefinition,
-      properties,
+  // Find the primary key fields
+  final primaryKeyFields = _findPrimaryKeyFields(
+    effectiveDefinition,
+    properties,
+  );
+
+  // Generate getter methods for all fields
+  for (final entry in properties.entries) {
+    final columnName = entry.key;
+    final property = entry.value as Map<String, dynamic>;
+    final fieldName = columnName.toCamelCase();
+    final apiType = property['format'] ?? property['type'] ?? 'unknown';
+
+    // Skip if this is a primary key field (it will be handled separately)
+    bool isPrimaryKey = primaryKeyFields.any((pk) => pk['name'] == columnName);
+    if (isPrimaryKey) continue;
+
+    // Generate parameter with proper type
+    String paramType;
+    if (apiType == 'integer' ||
+        apiType == 'int4' ||
+        apiType == 'int8' ||
+        apiType == 'bigint') {
+      paramType = 'int';
+    } else if (apiType == 'uuid') {
+      paramType = 'String';
+    } else {
+      paramType = _mapType(
+        apiType,
+        false, // Parameters for getters are not nullable
+        columnName: columnName,
+        property: property,
+        enumTypeNames: columnEnumMap,
+      );
+    }
+
+    // Determine default orderBy value
+    String defaultOrderBy = 'null';
+    if (properties.containsKey('updated_at')) {
+      defaultOrderBy = '"updated_at"';
+    } else if (properties.containsKey('created_at')) {
+      defaultOrderBy = '"created_at"';
+    }
+
+    // Add method documentation
+    classBuffer.writeln();
+    classBuffer.writeln(
+      '  /// Retrieves a single row from the database by $fieldName.',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Returns the row if found, or throws an error if not found.',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// [orderBy] specifies which field to sort by. If not provided, defaults to:',
+    );
+    classBuffer.writeln('  /// - "updated_at" if the field exists');
+    classBuffer.writeln('  /// - "created_at" if the field exists');
+    classBuffer.writeln('  /// - No default ordering if neither field exists');
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// [orderAsc] determines the sort order. Defaults to false (descending).',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Requires [supabase_flutter] package to be installed and initialized.',
     );
 
-    // Only generate getFrom method if primary keys are found
-    if (primaryKeyFields.isNotEmpty) {
-      // Add method documentation
-      classBuffer.writeln();
-      classBuffer.writeln(
-        '  /// Fetches a single row from the database by its primary key.',
-      );
-      classBuffer.writeln('  /// ');
-      classBuffer.writeln(
-        '  /// Returns the row if found, or throws an error if not found.',
-      );
-      classBuffer.writeln('  /// ');
-      classBuffer.writeln(
-        '  /// Requires [supabase_flutter] package to be installed and initialized.',
-      );
+    // Generate the getter method
+    final methodName =
+        'retrieveBy${fieldName[0].toUpperCase()}${fieldName.substring(1)}';
+    classBuffer.writeln('  static Future<$className> $methodName(');
+    classBuffer.writeln('    $paramType $fieldName, {');
+    classBuffer.writeln('    String? orderBy = $defaultOrderBy,');
+    classBuffer.writeln('    bool orderAsc = false,');
+    classBuffer.writeln('  }) async {');
+    classBuffer.writeln('    final query = Supabase.instance.client');
+    classBuffer.writeln('        .from(table)');
+    classBuffer.writeln('        .select()');
+    classBuffer.writeln('        .eq(field.$fieldName, $fieldName);');
+    classBuffer.writeln();
+    classBuffer.writeln('    // Apply ordering if specified');
+    classBuffer.writeln('    if (orderBy != null) {');
+    classBuffer.writeln('      query.order(orderBy, ascending: orderAsc);');
+    classBuffer.writeln('    }');
+    classBuffer.writeln();
+    classBuffer.writeln('    final response = await query.single();');
+    classBuffer.writeln('    return $className.fromJson(response);');
+    classBuffer.writeln('  }');
+  }
 
-      // Create method name based on primary key fields
-      String methodName = 'getFrom';
-      List<String> parameters = [];
-      List<String> conditions = [];
+  // Handle primary key getters
+  if (primaryKeyFields.isNotEmpty) {
+    // Determine default orderBy value
+    String defaultOrderBy = 'null';
+    if (properties.containsKey('updated_at')) {
+      defaultOrderBy = 'field.updatedAt';
+    } else if (properties.containsKey('created_at')) {
+      defaultOrderBy = 'field.createdAt';
+    }
 
-      if (primaryKeyFields.length == 1) {
-        // For single primary key, use the field name directly
-        final pkField = primaryKeyFields[0];
+    // Add method documentation
+    classBuffer.writeln();
+    classBuffer.writeln(
+      '  /// Retrieves a single row from the database by its primary key.',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Returns the row if found, or throws an error if not found.',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// [orderBy] specifies which field to sort by. If not provided, defaults to:',
+    );
+    classBuffer.writeln('  /// - "updated_at" if the field exists');
+    classBuffer.writeln('  /// - "created_at" if the field exists');
+    classBuffer.writeln('  /// - No default ordering if neither field exists');
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// [orderAsc] determines the sort order. Defaults to false (descending).',
+    );
+    classBuffer.writeln('  /// ');
+    classBuffer.writeln(
+      '  /// Requires [supabase_flutter] package to be installed and initialized.',
+    );
+
+    // Create method name based on primary key fields
+    String methodName = 'retrieveFrom';
+    List<String> parameters = [];
+    List<String> conditions = [];
+
+    if (primaryKeyFields.length == 1) {
+      // For single primary key, use the field name directly
+      final pkField = primaryKeyFields[0];
+      final fieldName = pkField['field_name'] as String;
+      final property = pkField['property'] as Map<String, dynamic>;
+      final originalName = pkField['name'] as String;
+
+      // Capitalize first letter for method name
+      methodName += fieldName[0].toUpperCase() + fieldName.substring(1);
+
+      // Generate parameter with proper type
+      final apiType = property['format'] ?? property['type'] ?? 'unknown';
+      String paramType;
+
+      if (apiType == 'integer' ||
+          apiType == 'int4' ||
+          apiType == 'int8' ||
+          apiType == 'bigint') {
+        paramType = 'int';
+      } else if (apiType == 'uuid') {
+        paramType = 'String';
+      } else {
+        paramType = _mapType(
+          apiType,
+          false, // Primary keys are usually not nullable
+          columnName: originalName,
+          property: property,
+          enumTypeNames: columnEnumMap,
+        );
+      }
+
+      parameters.add('$paramType $fieldName');
+      conditions.add('field.$fieldName, $fieldName');
+    } else {
+      // For composite keys, create a more descriptive method name
+      methodName = 'retrieveFromComposite';
+      for (final pkField in primaryKeyFields) {
         final fieldName = pkField['field_name'] as String;
         final property = pkField['property'] as Map<String, dynamic>;
         final originalName = pkField['name'] as String;
 
-        // Capitalize first letter for method name
+        // Add to method name
         methodName += fieldName[0].toUpperCase() + fieldName.substring(1);
 
         // Generate parameter with proper type
@@ -914,10 +1041,9 @@ String _generateRowClass(
         } else if (apiType == 'uuid') {
           paramType = 'String';
         } else {
-          // Use the full type mapping for other types
           paramType = _mapType(
             apiType,
-            false, // Primary keys are usually not nullable
+            false,
             columnName: originalName,
             property: property,
             enumTypeNames: columnEnumMap,
@@ -926,67 +1052,39 @@ String _generateRowClass(
 
         parameters.add('$paramType $fieldName');
         conditions.add('field.$fieldName, $fieldName');
-      } else {
-        // For composite keys, combine field names
-        for (final pkField in primaryKeyFields) {
-          final fieldName = pkField['field_name'] as String;
-          final property = pkField['property'] as Map<String, dynamic>;
-          final originalName = pkField['name'] as String;
-
-          // Capitalize for method name part
-          methodName += fieldName[0].toUpperCase() + fieldName.substring(1);
-
-          // Generate parameter with proper type
-          final apiType = property['format'] ?? property['type'] ?? 'unknown';
-          String paramType;
-
-          if (apiType == 'integer' ||
-              apiType == 'int4' ||
-              apiType == 'int8' ||
-              apiType == 'bigint') {
-            paramType = 'int';
-          } else if (apiType == 'uuid') {
-            paramType = 'String';
-          } else {
-            paramType = _mapType(
-              apiType,
-              false,
-              columnName: originalName,
-              property: property,
-              enumTypeNames: columnEnumMap,
-            );
-          }
-
-          parameters.add('$paramType $fieldName');
-          conditions.add('field.$fieldName, $fieldName');
-        }
       }
-
-      // Log the generated method name and parameters
-      print('  Generated fetch method: $methodName(${parameters.join(', ')})');
-
-      classBuffer.writeln(
-        '  static Future<$className> $methodName(${parameters.join(', ')}) async {',
-      );
-      classBuffer.writeln(
-        '    final response = await Supabase.instance.client',
-      );
-      classBuffer.writeln('        .from(table)');
-      classBuffer.writeln('        .select()');
-
-      // Add condition for each primary key
-      for (final condition in conditions) {
-        classBuffer.writeln('        .eq($condition)');
-      }
-
-      classBuffer.writeln('        .single();');
-      classBuffer.writeln('    return $className.fromJson(response);');
-      classBuffer.writeln('  }');
-    } else {
-      print(
-        '  ⚠️ No primary keys found for $tableName, skipping getFrom method',
-      );
     }
+
+    // Log the generated method name and parameters
+    print('  Generated fetch method: $methodName(${parameters.join(', ')})');
+
+    classBuffer.writeln('  static Future<$className> $methodName(');
+    classBuffer.writeln('    ${parameters.join(', ')}, {');
+    classBuffer.writeln('    String? orderBy = $defaultOrderBy,');
+    classBuffer.writeln('    bool orderAsc = false,');
+    classBuffer.writeln('  }) async {');
+    classBuffer.writeln('    final query = Supabase.instance.client');
+    classBuffer.writeln('        .from(table)');
+    classBuffer.writeln('        .select()');
+
+    // Add condition for each primary key
+    for (final condition in conditions) {
+      classBuffer.writeln('        .eq($condition)');
+    }
+
+    classBuffer.writeln();
+    classBuffer.writeln('    // Apply ordering if specified');
+    classBuffer.writeln('    if (orderBy != null) {');
+    classBuffer.writeln('      query.order(orderBy, ascending: orderAsc);');
+    classBuffer.writeln('    }');
+    classBuffer.writeln();
+    classBuffer.writeln('    final response = await query.single();');
+    classBuffer.writeln('    return $className.fromJson(response);');
+    classBuffer.writeln('  }');
+  } else {
+    print(
+      '  ⚠️ No primary keys found for $tableName, skipping retrieveFrom method',
+    );
   }
 
   classBuffer.writeln('}');
